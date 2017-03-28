@@ -11,7 +11,7 @@ License: GPLv3.
 
 Requires gnome-clocks (`sudo apt install org.gnome.clocks`).
 
-![screenshot](https://raw.githubusercontent.com/pacoqueen/gnome-shell-alarm/master/screenshot.png)
+![screenshot](https://raw.githubusercontent.com/pacoqueen/gnome-shell-alarm/master/screenshot.png "Screenshot")
 
 ## Installation
 
