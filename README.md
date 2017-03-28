@@ -10,3 +10,13 @@ Author: [pacoqueen@gmail.com](mailto:pacoqueen@gmail.com)
 License: GPLv3.
 
 Requires gnome-clocks (`sudo apt install org.gnome.clocks`).
+
+[]
+
+## Installation
+
+Active
+
+## Usage
+
+
