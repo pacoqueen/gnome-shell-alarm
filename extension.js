@@ -30,6 +30,8 @@ const DEBUG = false;
 
 let acMenu;             // Botón de la extensión.
 let clock_settings;     // Configuración de dconf donde se guardan las alarmas.
+let _alarm_changed_id;  // Callback señal cambio alarmas. Se debe desconectar
+                        // al desactivar la extensión.
 
 function _showAlarms(){
     /*
@@ -47,7 +49,8 @@ function _showAlarms(){
         </interface>\
     </node>';
     const MyClockProxy = Gio.DBusProxy.makeProxyWrapper(MyClockIface);
-    let instance = new MyClockProxy(Gio.DBus.session, 'org.gnome.clocks', '/org/gnome/clocks');
+    let instance = new MyClockProxy(Gio.DBus.session, 'org.gnome.clocks',
+                                    '/org/gnome/clocks');
     instance.ActivateRemote(function(result, error){
         log(result);
         log(error);
@@ -113,9 +116,12 @@ function find_next_alarm(){
                 a_minutos = alarma.minute.unpack();
                 // Diferencia en minutos en positivo hasta las alarmas futuras
                 // o en negativo para las que ya han pasado y se repetirán.
-                dif = ((a_dia - dia)*24*60) + ((a_hora - hora)*60) + (a_minutos - minutos);
+                dif = (((a_dia - dia) * 24 * 60)
+                        +((a_hora - hora) * 60)
+                        +(a_minutos - minutos));
                 if (DEBUG){
-                    log(alarma.name.unpack() + " [" + a_dia + "·" + a_hora + ":" + a_minutos + "]: " + dif + " (" + menor_dif + ")");
+                    log(alarma.name.unpack() + " [" + a_dia + "·" + a_hora + ":"
+                        + a_minutos + "]: " + dif + " (" + menor_dif + ")");
                 }
                 if ((menor_dif == null)
                         || (menor_dif < 0 && dif >= 0)
@@ -126,17 +132,19 @@ function find_next_alarm(){
                     // preferencia sobre las pasadas una vez encuentre la primera.
                     menor_dif = dif
                     pad = "00";
-                    str_hora = alarma.hour.unpack() + ":" + pad.substring(0, pad.length - alarma.minute.unpack().toString().length) + alarma.minute.unpack().toString();
+                    str_minute = alarma.minute.unpack().toString();
+                    str_hora = (alarma.hour.unpack() + ":"
+                                + pad.substring(0, pad.length - str_minute.length)
+                                + str_minute);
                     if (a_dia == dia){
                         str_day = "";
                     } else {
                         str_day = get_str_day(a_dia) + " ";
                     }
                     clock_symbol = "⌚";
-                    str_alarm = clock_symbol + " " + alarma.name.unpack() + " [" + str_day + str_hora + "]";
-                    if (DEBUG){
-                        log(str_alarm);
-                    }
+                    str_alarm = (clock_symbol + " " + alarma.name.unpack()
+                                 + " [" + str_day + str_hora + "]");
+                    if (DEBUG) log(str_alarm);
                 }
             }
         }
@@ -174,9 +182,9 @@ const AlarmIndicator = new Lang.Class({
         this.buttonText.set_child(this.label);
         this.actor.add_actor(this.buttonText);
         this.buttonText.connect('button-press-event', _showAlarms);
-        log("Alarm Clock: Inicialización completa");
         this._update_button();
         this._connect_clocks_signal();
+        if (DEBUG) log("Alarm Clock: Inicialización completa");
     },
 
     _update_button: function (){
@@ -184,9 +192,9 @@ const AlarmIndicator = new Lang.Class({
          * Actualiza el texto del botón mostrando la siguiente alarma que
          * sonará.
          */
-        log("_update_button");
+        if (DEBUG) log("_update_button");
         str_next_alarm = find_next_alarm();
-        log(" → " + str_next_alarm);
+        if (DEBUG) log(" → " + str_next_alarm);
         this.label.set_text(str_next_alarm);
     },
 
@@ -197,7 +205,9 @@ const AlarmIndicator = new Lang.Class({
          * la alarma mostrada en el botón (si fuese necesario).
          * org.gnome.clocks no proporciona ninguna señal por dbus.
          */
-        clock_settings.connect('changed::alarms', Lang.bind(this, this._update_button));
+        _alarm_changed_id = clock_settings.connect('changed::alarms',
+                                                   Lang.bind(this,
+                                                             this._update_button));
     }
 });
 
@@ -218,13 +228,16 @@ function show_alarms_in_debuglog() {
             str_activa = '✘';
         }
         pad = "00";
-        hora = alarma.hour.unpack() + ":" + pad.substring(0, pad.length - alarma.minute.unpack().toString().length) + alarma.minute.unpack().toString();
+        str_minute = alarma.minute.unpack().toString();
+        hora = (alarma.hour.unpack() + ":"
+                + pad.substring(0, pad.length - str_minute.length) + str_minute);
         dias = alarma.days.unpack();
         var str_dias = "";
         for (j=0; j<dias.length; j++){
             str_dias = str_dias + get_str_day(dias[j].unpack()) + " ";
         }
-        str_alarma = alarma.name.unpack() + " a las " + hora + " los " + str_dias + " " + str_activa;
+        str_alarma = (alarma.name.unpack() + " a las " + hora + " los "
+                      + str_dias + " " + str_activa);
         log(str_alarma);
     }
 }
@@ -243,6 +256,7 @@ function enable() {
     /*
      * Activación de la extensión. Es donde se crea el botón.
      */
+    if (DEBUG) log("Alarm Clock: Activando extensión...");
     acMenu = new AlarmIndicator;
     Main.panel.addToStatusArea('alarm-indicator', acMenu);
 }
@@ -251,5 +265,7 @@ function disable() {
     /*
      * Extensión desactivada, elimino el objeto y todo caerá detrás.
      */
+    clock_settings.disconnect(_alarm_changed_id);
     acMenu.destroy();
+    if (DEBUG) log("Alarm Clock: Desactivación completada.");
 }
