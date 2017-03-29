@@ -15,7 +15,7 @@ Requires gnome-clocks (`sudo apt install org.gnome.clocks`).
 
 ## Installation
 
-Download _zip_ and install using **gnome-tweak-tool** (`sudo apt install gnome-tweak-tool`)
+Download _zip_ and install using **gnome-tweak-tool** (`sudo apt install gnome-tweak-tool`) or *unzip* it on `~/.local/share/gnome-shell/extensions`.
 
 ## Usage
 
