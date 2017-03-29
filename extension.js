@@ -18,7 +18,15 @@ const PanelMenu = imports.ui.panelMenu;
 const Util = imports.misc.util;
 const Gio = imports.gi.Gio;
 
-const DEFAULT_TEXT = _("Alarmas");
+// i10n i18n
+const Me = imports.misc.extensionUtils.getCurrentExtension();
+const Gettext = imports.gettext;
+Gettext.textdomain(Me.metadata['gettext-domain']);
+Gettext.bindtextdomain(Me.metadata['gettext-domain'], Me.path + "/locale");
+const _ = Gettext.gettext;
+
+const DEFAULT_TEXT = _("Alarms");
+const DEBUG = false;
 
 let acMenu;             // Botón de la extensión.
 let clock_settings;     // Configuración de dconf donde se guardan las alarmas.
@@ -52,25 +60,25 @@ function get_str_day(day) {
      */
     switch (day) {
         case 1:
-            str_day = _("lun");
+            str_day = _("mon");
             break;
         case 2:
-            str_day = _("mar");
+            str_day = _("tue");
             break;
         case 3:
-            str_day = _("mié");
+            str_day = _("wed");
             break;
         case 4:
-            str_day = _("jue");
+            str_day = _("thu");
             break;
         case 5:
-            str_day = _("vie");
+            str_day = _("fri");
             break;
         case 6:
-            str_day = _("sáb");
+            str_day = _("sat");
             break;
         case 7:
-            str_day = _("dom");
+            str_day = _("sun");
             break;
         default:
             str_day = "";
@@ -106,7 +114,9 @@ function find_next_alarm(){
                 // Diferencia en minutos en positivo hasta las alarmas futuras
                 // o en negativo para las que ya han pasado y se repetirán.
                 dif = ((a_dia - dia)*24*60) + ((a_hora - hora)*60) + (a_minutos - minutos);
-                log(alarma.name.unpack() + " [" + a_dia + "·" + a_hora + ":" + a_minutos + "]: " + dif + " (" + menor_dif + ")");
+                if (DEBUG){
+                    log(alarma.name.unpack() + " [" + a_dia + "·" + a_hora + ":" + a_minutos + "]: " + dif + " (" + menor_dif + ")");
+                }
                 if ((menor_dif == null)
                         || (menor_dif < 0 && dif >= 0)
                         || (menor_dif > 0 && dif >= 0 && dif < menor_dif)
@@ -124,7 +134,9 @@ function find_next_alarm(){
                     }
                     clock_symbol = "⌚";
                     str_alarm = clock_symbol + " " + alarma.name.unpack() + " [" + str_day + str_hora + "]";
-                    log(str_alarm);
+                    if (DEBUG){
+                        log(str_alarm);
+                    }
                 }
             }
         }
@@ -222,7 +234,9 @@ function init() {
      * Inicialización de la extensión. Se leen las alarmas de gsettings.
      */
     clock_settings = new Gio.Settings({schema: "org.gnome.clocks"});
-    show_alarms_in_debuglog();
+    if (DEBUG){
+        show_alarms_in_debuglog();
+    }
 }
 
 function enable() {

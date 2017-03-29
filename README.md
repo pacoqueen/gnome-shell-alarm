@@ -5,7 +5,7 @@ alarm-clock
 
 Gnome shell extension to show current active alarms on panel.
 
-Author: [pacoqueen@gmail.com](mailto:pacoqueen@gmail.com)
+Author: ✉ [pacoqueen@gmail.com](mailto:pacoqueen@gmail.com); ↪ [http://www.qinn.es](http://www.qinn.es)
 
 License: GPLv3.
 

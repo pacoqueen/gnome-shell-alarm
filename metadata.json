@@ -2,4 +2,6 @@
  "name": "Alarm Clock",
  "description": "Show alarms from org.gnome.clock on notify area.",
  "url": "https://github.com/pacoqueen/gnome-shell-alarm",
+ "gettext-domain": "gnome-shell-alarm-clock",
+ "localedir": "/usr/local/share/locale",
  "shell-version": ["3.22.3"]}
