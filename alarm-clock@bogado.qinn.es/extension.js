@@ -17,6 +17,7 @@ const Clutter = imports.gi.Clutter;
 const PanelMenu = imports.ui.panelMenu;
 const Util = imports.misc.util;
 const Gio = imports.gi.Gio;
+const Mainloop = imports.mainloop;
 
 // i10n i18n
 const Me = imports.misc.extensionUtils.getCurrentExtension();
@@ -26,18 +27,20 @@ Gettext.bindtextdomain(Me.metadata['gettext-domain'], Me.path + "/locale");
 const _ = Gettext.gettext;
 
 const DEFAULT_TEXT = _("Alarms");
-const DEBUG = false;
+const DEBUG = true;
 
+var timeout;            // Callback para la actualización cada minuto.
 let acMenu;             // Botón de la extensión.
 let clock_settings;     // Configuración de dconf donde se guardan las alarmas.
 let _alarm_changed_id;  // Callback señal cambio alarmas. Se debe desconectar
                         // al desactivar la extensión.
 
-function _showAlarms(){
+function _showAlarms(minimized=false){
     /*
      * Abre la ventana de gnome.org.clocks, donde se pueden ver y editar las
      * alarmas, a través  de dbus.
      */
+    // TODO: Si minimized es true, iniciar minimizado o minimizar tras iniciar. ¿Cómo? No lo sé. Por DBus no se puede.
     log("Ejecutando org.gnome.clocks...");
     // Util.spawn(['/usr/bin/gnome-clocks']);
     const MyClockIface = '<node>\
@@ -95,6 +98,7 @@ function find_next_alarm(){
      * la hora en una cadena.
      */
     str_alarm = DEFAULT_TEXT;
+    var res = [str_alarm, null, null];
     menor_dif = null;
     alarms = clock_settings.get_value("alarms");
     alarmas = alarms.deep_unpack();
@@ -125,8 +129,7 @@ function find_next_alarm(){
                 }
                 if ((menor_dif == null)
                         || (menor_dif < 0 && dif >= 0)
-                        || (menor_dif > 0 && dif >= 0 && dif < menor_dif)
-                        || (menor_dif < 0 && dif < 0 && dif > menor_dif)){
+                        || (dif < menor_dif)){
                     // La primera alarma activa, pasada o futura, siempre será la
                     // próxima hasta encontrar una mejor. Pero las futuras tienen
                     // preferencia sobre las pasadas una vez encuentre la primera.
@@ -141,15 +144,20 @@ function find_next_alarm(){
                     } else {
                         str_day = get_str_day(a_dia) + " ";
                     }
-                    clock_symbol = "⌚";
+                    let clock_symbol = "⌚";
+                    if (dif == 0){
+                        clock_symbol = "⚠";
+                    }
                     str_alarm = (clock_symbol + " " + alarma.name.unpack()
                                  + " [" + str_day + str_hora + "]");
                     if (DEBUG) log(str_alarm);
+                    next_alarm = [a_dia, a_hora, a_minutos];
+                    res = [str_alarm, next_alarm, menor_dif];
                 }
             }
         }
     }
-    return str_alarm;
+    return res;
 }
 
 const AlarmIndicator = new Lang.Class({
@@ -193,7 +201,8 @@ const AlarmIndicator = new Lang.Class({
          * sonará.
          */
         if (DEBUG) log("_update_button");
-        str_next_alarm = find_next_alarm();
+        array_next_alarm = find_next_alarm();
+        var str_next_alarm = array_next_alarm[0];
         if (DEBUG) log(" → " + str_next_alarm);
         this.label.set_text(str_next_alarm);
     },
@@ -242,6 +251,66 @@ function show_alarms_in_debuglog() {
     }
 }
 
+function _refresh(){
+    /*
+     * Comprueba si la próxima alarma es en el siguiente minuto y lanza
+     * org.gnome.clock **para que suene**. Si no está en memoria, aunque sea
+     * minimizado. No suena la alarma.
+     * Primero comprueba que la siguiente alarma no se ha cumplido ya, en cuyo
+     * caso la cambia por la siguiente.
+     */
+    array_next_alarm = find_next_alarm();
+    str_next_alarm = array_next_alarm[0];
+    next_alarm = array_next_alarm[1];
+    dif = array_next_alarm[2];
+    str_active_alarm = acMenu.label.text;
+    if (str_active_alarm != str_next_alarm || dif == 0){
+        if (next_alarm){
+            acMenu._update_button();
+        } else {
+            acMenu._update_button();
+        }
+    }
+    if (next_alarm != null){
+        if (DEBUG) log(" >>>>>>>> next_alarm: " + next_alarm);
+        if (DEBUG) log(" >>>>>>>> dif: " + dif);
+        let process_id = dbus_get_process_id();
+        if (DEBUG) log(" >>>>>>>>> > pid: " + process_id);
+        if (dif >= 0 && dif <= 1){
+            process_id = dbus_get_process_id();
+            if (process_id == null){}
+                _showAlarms(minimized=true);
+        }
+    }
+}
+
+function dbus_get_process_id(){
+    /*
+     * Obtiene a través de dbus el pid del proceso org.gnome.clocks o null si
+     * no está iniciado.
+     */
+    let pid = null;
+    const MyDBusIface = '<node>\
+        <interface name="org.freedesktop.DBus">\
+            <method name="GetConnectionUnixProcessID">\
+                <arg type="s" name="name" direction="in">\
+                </arg>\
+                <arg type="u" name="pid" direction="out">\
+                </arg>\
+            </method>\
+        </interface>\
+    </node>';
+    const MyDBusProxy = Gio.DBusProxy.makeProxyWrapper(MyDBusIface);
+    let instance = new MyDBusProxy(Gio.DBus.session, 'org.freedesktop.DBus',
+                                   '/org/freedesktop/DBus');
+    try {
+        pid = instance.GetConnectionUnixProcessIDSync('org.gnome.clocks');
+    } catch (e) {
+        log(e);
+    }
+    return pid;
+}
+
 function init() {
     /*
      * Inicialización de la extensión. Se leen las alarmas de gsettings.
@@ -259,12 +328,18 @@ function enable() {
     if (DEBUG) log("Alarm Clock: Activando extensión...");
     acMenu = new AlarmIndicator;
     Main.panel.addToStatusArea('alarm-indicator', acMenu);
+    var segundos = 60 * 1000;   // Un minuto.
+    timeout = Mainloop.timeout_add(segundos, function () {
+        _refresh();
+        return true;
+    });
 }
 
 function disable() {
     /*
      * Extensión desactivada, elimino el objeto y todo caerá detrás.
      */
+    Mainloop.source_remove(timeout);
     clock_settings.disconnect(_alarm_changed_id);
     acMenu.destroy();
     if (DEBUG) log("Alarm Clock: Desactivación completada.");
