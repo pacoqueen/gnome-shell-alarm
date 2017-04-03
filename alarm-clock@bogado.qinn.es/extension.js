@@ -27,7 +27,7 @@ Gettext.bindtextdomain(Me.metadata['gettext-domain'], Me.path + "/locale");
 const _ = Gettext.gettext;
 
 const DEFAULT_TEXT = _("Alarms");
-const DEBUG = true;
+const DEBUG = false;
 
 var timeout;            // Callback para la actualización cada minuto.
 let acMenu;             // Botón de la extensión.
@@ -40,7 +40,7 @@ function _showAlarms(minimized=false){
      * Abre la ventana de gnome.org.clocks, donde se pueden ver y editar las
      * alarmas, a través  de dbus.
      */
-    // TODO: Si minimized es true, iniciar minimizado o minimizar tras iniciar. ¿Cómo? No lo sé. Por DBus no se puede.
+    // TODO: Si minimized es true, iniciar minimizado o minimizar tras iniciar. ¿Cómo? No lo sé. Por DBus no lo veo claro.
     log("Ejecutando org.gnome.clocks...");
     // Util.spawn(['/usr/bin/gnome-clocks']);
     const MyClockIface = '<node>\
@@ -123,6 +123,9 @@ function find_next_alarm(){
                 dif = (((a_dia - dia) * 24 * 60)
                         +((a_hora - hora) * 60)
                         +(a_minutos - minutos));
+                if (dif < 0){ // Alarma pasada. Para simplificar comparaciones...
+                    dif += (7 * 24 * 60);   // ... sumo una semana.
+                }
                 if (DEBUG){
                     log(alarma.name.unpack() + " [" + a_dia + "·" + a_hora + ":"
                         + a_minutos + "]: " + dif + " (" + menor_dif + ")");
