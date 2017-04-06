@@ -17,6 +17,8 @@ Requires gnome-clocks (`sudo apt install org.gnome.clocks`).
 
 Download _zip_ and install using **gnome-tweak-tool** (`sudo apt install gnome-tweak-tool`) or *unzip* it on `~/.local/share/gnome-shell/extensions`.
 
+It can be installed too using [extensions.gnome.org](https://extensions.gnome.org/extension/1192/alarm-clock/).
+
 ## Usage
 
 Load extension and see. It simply shows the next active alarm on panel.
