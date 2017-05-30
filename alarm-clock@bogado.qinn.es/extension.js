@@ -34,30 +34,35 @@ let acMenu;             // Botón de la extensión.
 let clock_settings;     // Configuración de dconf donde se guardan las alarmas.
 let _alarm_changed_id;  // Callback señal cambio alarmas. Se debe desconectar
                         // al desactivar la extensión.
+var org_gnome_clocks=false;  // Si no está instalado el 'new Gio.Settings' peta.
 
 function _showAlarms(minimized=false){
     /*
      * Abre la ventana de gnome.org.clocks, donde se pueden ver y editar las
      * alarmas, a través  de dbus.
      */
-    // TODO: Si minimized es true, iniciar minimizado o minimizar tras iniciar. ¿Cómo? No lo sé. Por DBus no lo veo claro.
-    log("Ejecutando org.gnome.clocks...");
-    // Util.spawn(['/usr/bin/gnome-clocks']);
-    const MyClockIface = '<node>\
-        <interface name="org.freedesktop.Application">\
-            <method name="Activate">\
-                <arg type="a{sv}" name="platform-data" direction="in">\
-                </arg>\
-            </method>\
-        </interface>\
-    </node>';
-    const MyClockProxy = Gio.DBusProxy.makeProxyWrapper(MyClockIface);
-    let instance = new MyClockProxy(Gio.DBus.session, 'org.gnome.clocks',
-                                    '/org/gnome/clocks');
-    instance.ActivateRemote(function(result, error){
-        log(result);
-        log(error);
-    });
+    if ( ! org_gnome_clocks ){
+        if (DEBUG) log("org.gnome.clocks no instalado.");
+    } else {
+        // TODO: Si minimized es true, iniciar minimizado o minimizar tras iniciar. ¿Cómo? No lo sé. Por DBus no lo veo claro.
+        log("Ejecutando org.gnome.clocks...");
+        // Util.spawn(['/usr/bin/gnome-clocks']);
+        const MyClockIface = '<node>\
+            <interface name="org.freedesktop.Application">\
+                <method name="Activate">\
+                    <arg type="a{sv}" name="platform-data" direction="in">\
+                    </arg>\
+                </method>\
+            </interface>\
+        </node>';
+        const MyClockProxy = Gio.DBusProxy.makeProxyWrapper(MyClockIface);
+        let instance = new MyClockProxy(Gio.DBus.session, 'org.gnome.clocks',
+                                        '/org/gnome/clocks');
+        instance.ActivateRemote(function(result, error){
+            log(result);
+            log(error);
+        });
+    }
 }
 
 function get_str_day(day) {
@@ -204,8 +209,12 @@ const AlarmIndicator = new Lang.Class({
          * sonará.
          */
         if (DEBUG) log("_update_button");
-        array_next_alarm = find_next_alarm();
-        var str_next_alarm = array_next_alarm[0];
+        if (clock_settings == null){
+            var str_next_alarm = _("org.gnome.clocks not installed")
+        } else {
+            array_next_alarm = find_next_alarm();
+            var str_next_alarm = array_next_alarm[0];
+        }
         if (DEBUG) log(" → " + str_next_alarm);
         this.label.set_text(str_next_alarm);
     },
@@ -217,9 +226,13 @@ const AlarmIndicator = new Lang.Class({
          * la alarma mostrada en el botón (si fuese necesario).
          * org.gnome.clocks no proporciona ninguna señal por dbus.
          */
-        _alarm_changed_id = clock_settings.connect('changed::alarms',
-                                                   Lang.bind(this,
-                                                             this._update_button));
+        if (clock_settings == null){
+            if (DEBUG) log("org.gnome.clocks no instalado.")
+        } else {
+            _alarm_changed_id = clock_settings.connect('changed::alarms',
+                                                       Lang.bind(this,
+                                                        this._update_button));
+        }
     }
 });
 
@@ -229,28 +242,36 @@ function show_alarms_in_debuglog() {
      * `sudo journalctl /usr/bin/gnome-shell -f -o cat`
      */
 
-    alarms = clock_settings.get_value("alarms");
-    alarmas = alarms.deep_unpack();
-    for (i=0; i<alarmas.length; ++i){
-        alarma = alarmas[i];
-        activa = alarma.active.unpack();
-        if (activa){
-            str_activa = '✔';
-        } else {
-            str_activa = '✘';
+    var activa;
+    var str_activa;
+    var dias;
+    var str_alarma;
+    if (clock_settings == null){
+        if (DEBUG) log("Alarm Clock: org.gnome.clocks no instalado.");
+    } else {
+        alarms = clock_settings.get_value("alarms");
+        alarmas = alarms.deep_unpack();
+        for (i=0; i<alarmas.length; ++i){
+            alarma = alarmas[i];
+            activa = alarma.active.unpack();
+            if (activa){
+                str_activa = '✔';
+            } else {
+                str_activa = '✘';
+            }
+            pad = "00";
+            str_minute = alarma.minute.unpack().toString();
+            hora = (alarma.hour.unpack() + ":"
+                    + pad.substring(0, pad.length - str_minute.length) + str_minute);
+            dias = alarma.days.unpack();
+            var str_dias = "";
+            for (j=0; j<dias.length; j++){
+                str_dias = str_dias + get_str_day(dias[j].unpack()) + " ";
+            }
+            str_alarma = (alarma.name.unpack() + " a las " + hora + " los "
+                        + str_dias + " " + str_activa);
+            log(str_alarma);
         }
-        pad = "00";
-        str_minute = alarma.minute.unpack().toString();
-        hora = (alarma.hour.unpack() + ":"
-                + pad.substring(0, pad.length - str_minute.length) + str_minute);
-        dias = alarma.days.unpack();
-        var str_dias = "";
-        for (j=0; j<dias.length; j++){
-            str_dias = str_dias + get_str_day(dias[j].unpack()) + " ";
-        }
-        str_alarma = (alarma.name.unpack() + " a las " + hora + " los "
-                      + str_dias + " " + str_activa);
-        log(str_alarma);
     }
 }
 
@@ -262,11 +283,19 @@ function _refresh(){
      * Primero comprueba que la siguiente alarma no se ha cumplido ya, en cuyo
      * caso la cambia por la siguiente.
      */
-    array_next_alarm = find_next_alarm();
-    str_next_alarm = array_next_alarm[0];
-    next_alarm = array_next_alarm[1];
-    dif = array_next_alarm[2];
-    str_active_alarm = acMenu.label.text;
+    if (clock_settings == null){
+        if (DEBUG) log("Alarm Clock: org.gnome.clocks no instalado.");
+        str_active_alarm = _("org.gnome.clocks not installed");
+        next_alarm = null;
+        str_next_alarm = "";
+        dif = -1;
+    } else {
+        array_next_alarm = find_next_alarm();
+        str_next_alarm = array_next_alarm[0];
+        next_alarm = array_next_alarm[1];
+        dif = array_next_alarm[2];
+        str_active_alarm = acMenu.label.text;
+    }
     if (str_active_alarm != str_next_alarm || dif == 0){
         if (next_alarm){
             acMenu._update_button();
@@ -314,13 +343,42 @@ function dbus_get_process_id(){
     return pid;
 }
 
+function check_gsettings_schema(schema){
+    /*
+     * Returns true if schema is present on Gio schemas. False otherway.
+     */
+    var schemas = Gio.Settings.list_schemas();
+    for (var i=0; i<schemas.length; i++){
+        if (schemas[i] == schema){
+            return true
+        }
+    }
+    return false;
+}
+
+function check_for_clocks_instead_of_shaming_gio_crash_ty(){
+    /*
+     * Gio has an awuful way to tell me that org.gnome.clocks is not present
+     * in current schemas: crashing entire session.
+     * So this is only to check for org.gnome.clocks schema and returns true
+     * if so or false if not.
+     */
+    return check_gsettings_schema("org.gnome.clocks");
+}
+
 function init() {
     /*
      * Inicialización de la extensión. Se leen las alarmas de gsettings.
      */
-    clock_settings = new Gio.Settings({schema: "org.gnome.clocks"});
-    if (DEBUG){
-        show_alarms_in_debuglog();
+    org_gnome_clocks = check_for_clocks_instead_of_shaming_gio_crash_ty();
+    if ( ! org_gnome_clocks ){
+        if (DEBUG) log("Alarm Clock: org.gnome.clocks no instalado.");
+        clock_settings = null;
+    } else {
+        clock_settings = new Gio.Settings({schema: "org.gnome.clocks"});
+        if (DEBUG){
+            show_alarms_in_debuglog();
+        }
     }
 }
 
@@ -343,7 +401,11 @@ function disable() {
      * Extensión desactivada, elimino el objeto y todo caerá detrás.
      */
     Mainloop.source_remove(timeout);
-    clock_settings.disconnect(_alarm_changed_id);
+    if ( ! org_gnome_clocks ){
+        if (DEBUG) log("Alarm Clock: org.gnome.clocks no instalado.");
+    } else {
+        clock_settings.disconnect(_alarm_changed_id);
+    }
     acMenu.destroy();
     if (DEBUG) log("Alarm Clock: Desactivación completada.");
 }
