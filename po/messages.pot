@@ -3,6 +3,7 @@
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
 #
+#, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: gnome-shell-alarm-clock\n"
@@ -46,4 +47,9 @@ msgstr ""
 
 #: ../extension.js:80
 msgid "sun"
+msgstr ""
+
+#: ../alarm-clock@bogado.qinn.es/extension.js:213
+#: ../alarm-clock@bogado.qinn.es/extension.js:288
+msgid "org.gnome.clocks not installed"
 msgstr ""

@@ -49,3 +49,8 @@ msgstr "szo"
 #: ../extension.js:80
 msgid "sun"
 msgstr "vas"
+
+#: ../alarm-clock@bogado.qinn.es/extension.js:213
+#: ../alarm-clock@bogado.qinn.es/extension.js:288
+msgid "org.gnome.clocks not installed"
+msgstr ""
