@@ -196,7 +196,7 @@ const AlarmIndicator = new Lang.Class({
             y_align: Clutter.ActorAlign.CENTER
         });
         this.buttonText.set_child(this.label);
-        this.actor.add_actor(this.buttonText);
+        this.add_actor(this.buttonText);
         this.buttonText.connect('button-press-event', _showAlarms);
         this._update_button();
         this._connect_clocks_signal();
@@ -246,8 +246,9 @@ function show_alarms_in_debuglog() {
     var str_activa;
     var dias;
     var str_alarma;
+    log("Alarm Clock: buscando alarmas...");
     if (clock_settings == null){
-        if (DEBUG) log("Alarm Clock: org.gnome.clocks no instalado.");
+        log("Alarm Clock: org.gnome.clocks no instalado.");
     } else {
         alarms = clock_settings.get_value("alarms");
         alarmas = alarms.deep_unpack();
@@ -283,6 +284,7 @@ function _refresh(){
      * Primero comprueba que la siguiente alarma no se ha cumplido ya, en cuyo
      * caso la cambia por la siguiente.
      */
+    var str_active_alarm;
     if (clock_settings == null){
         if (DEBUG) log("Alarm Clock: org.gnome.clocks no instalado.");
         str_active_alarm = _("org.gnome.clocks not installed");
@@ -370,6 +372,7 @@ function init() {
     /*
      * Inicialización de la extensión. Se leen las alarmas de gsettings.
      */
+    if (DEBUG) log("Alarm Clock: Inicializando extensión. DEBUG activado.");
     org_gnome_clocks = check_for_clocks_instead_of_shaming_gio_crash_ty();
     if ( ! org_gnome_clocks ){
         if (DEBUG) log("Alarm Clock: org.gnome.clocks no instalado.");
