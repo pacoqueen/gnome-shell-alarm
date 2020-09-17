@@ -99,8 +99,10 @@ function get_str_day(day) {
 
 function find_next_alarm(){
     /*
-     * Encuentra la siguiente alarma **activa** y devuelve el nombre junto con
-     * la hora en una cadena.
+     * Encuentra la siguiente alarma **activa** y devuelve una tupla con:
+     * el nombre de la alarma y la hora en una cadena, una tupla con el
+     * día de la semana (en formato numérico), hora y minutos, y el tiempo
+     * que falta hasta que suene.
      */
     str_alarm = DEFAULT_TEXT;
     var res = [str_alarm, null, null];
@@ -214,9 +216,15 @@ const AlarmIndicator = new Lang.Class({
         } else {
             array_next_alarm = find_next_alarm();
             var str_next_alarm = array_next_alarm[0];
+            var str_falta = minutes_to_string(array_next_alarm[2]);
         }
-        if (DEBUG) log(" → " + str_next_alarm);
-        this.label.set_text(str_next_alarm);
+        if (str_falta) {
+            if (DEBUG) log(" → (" + str_falta + ")" + str_next_alarm);
+            this.label.set_text("(" + str_falta + ")" + str_next_alarm);
+        } else {
+            if (DEBUG) log(" → " + str_next_alarm);
+            this.label.set_text(str_next_alarm);
+        }
     },
 
     _connect_clocks_signal: function (){
@@ -236,7 +244,27 @@ const AlarmIndicator = new Lang.Class({
     }
 });
 
-function show_alarms_in_debuglog() {
+function minutes_to_string(m) {
+    /*
+     * Convierte el número recibido (minutos) en una cadena del tipo 1d2h31m.
+     */
+    var res = "";
+    if (m > 0) {
+        dias = parseInt(m / (24*60));
+        horas = parseInt((m / 60) % 24);
+        minutos = m % 60;
+        if (dias > 0) {
+            res += dias + "d";
+        }
+        if (horas > 0) {
+            res += horas + "h";
+        }
+        res += minutos + "m";
+    }
+    return res;
+}
+
+function show_alarms_in_debuglog(clock_settings) {
     /*
      * Muestra las alarmas en la consula de depuración. Se puede ver con:
      * `sudo journalctl /usr/bin/gnome-shell -f -o cat`
@@ -246,15 +274,17 @@ function show_alarms_in_debuglog() {
     var str_activa;
     var dias;
     var str_alarma;
+    var alarms;
     log("Alarm Clock: buscando alarmas...");
     if (clock_settings == null){
         log("Alarm Clock: org.gnome.clocks no instalado.");
     } else {
         alarms = clock_settings.get_value("alarms");
         alarmas = alarms.deep_unpack();
-        for (i=0; i<alarmas.length; ++i){
+        for (var i=0; i<alarmas.length; ++i){
             alarma = alarmas[i];
             activa = alarma.active.unpack();
+            // XXX: La versión 3.36 siempre devuelve que la alarma está activa aunque no lo esté.
             if (activa){
                 str_activa = '✔';
             } else {
@@ -285,6 +315,7 @@ function _refresh(){
      * caso la cambia por la siguiente.
      */
     var str_active_alarm;
+    var dif;
     if (clock_settings == null){
         if (DEBUG) log("Alarm Clock: org.gnome.clocks no instalado.");
         str_active_alarm = _("org.gnome.clocks not installed");
@@ -380,7 +411,7 @@ function init() {
     } else {
         clock_settings = new Gio.Settings({schema: "org.gnome.clocks"});
         if (DEBUG){
-            show_alarms_in_debuglog();
+            show_alarms_in_debuglog(clock_settings);
         }
     }
 }
