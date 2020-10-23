@@ -26,3 +26,10 @@ Not configurable by the moment.
 
 * Click to open Gnome Clocks and set, delete or create new alarms.
 
+## Troubleshooting
+
+If extension does not work, try to restart gnome-shell pressing `Alt+F2` and then type `r` and `ENTER`. Try to restart session too.
+
+If nothing works, check error status by pressing `Alt+F2` and typing `lg` (`ENTER`). Go to Extensions tab and press _Show Errors_ on _Alarm Clock_. It could be useful filling a [issue report](https://github.com/pacoqueen/gnome-shell-alarm/issues).
+
+Hint: You can get gnome-shell log by `sudo journalctl /usr/bin/gnome-shell -f -o cat` and reload the extension with [Gnome Shell Extension Reloader](https://extensions.gnome.org/extension/1137/gnome-shell-extension-reloader/) with no need to fully restart gnome-shell.
